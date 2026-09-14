@@ -7,6 +7,7 @@ The app queries the internal `Kuskus` database through a server-side API. Access
 ## Features
 
 - Filter by customer, Fabric capacity, cluster, alteration type, and time range.
+- Analyze rolling windows through 12 months or query all history retained by Kuskus.
 - Inspect CPU, cache hit ratio, query failures and latency, disk queue pressure, and top consumers.
 - Correlate health signals with Memento cluster and database alterations.
 - Run with Azure CLI authentication or managed identity.
@@ -66,6 +67,8 @@ The API validates parameters with Zod, escapes template bindings, selects a time
 ## Investigation Guidance
 
 Dashboard thresholds are triage aids, not service limits. Compare every signal with the cluster baseline and incident timeline.
+
+Time ranges include 6 hours, 24 hours, 3, 7, 14, and 28 days, 3, 6, and 12 months, and **All available**. The all-history option requests data from the Unix epoch; the earliest result is determined by each Kuskus function's underlying retention. Aggregation automatically widens from five minutes to seven days so long-range charts remain usable.
 
 - **CPU:** Sustained high P95 plus concentrated query CPU suggests workload optimization or scaling analysis.
 - **Cache:** Low hit ratio can indicate queried ranges outside cache policy, broad scans, or a policy change.

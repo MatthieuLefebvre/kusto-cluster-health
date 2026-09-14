@@ -72,6 +72,10 @@ export interface TopQuery {
   p95DurationMs: number;
   peakMemoryBytes: number;
   failures: number;
+  scannedExtents: number;
+  totalExtents: number;
+  scannedRows: number;
+  totalRows: number;
 }
 
 export interface HealthResponse {

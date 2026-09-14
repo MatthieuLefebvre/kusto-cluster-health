@@ -10,8 +10,17 @@ async function getJson<T extends object>(url: string, signal?: AbortSignal): Pro
   return payload as T;
 }
 
-export function getClusters(signal?: AbortSignal): Promise<Cluster[]> {
-  return getJson('/api/clusters', signal);
+export function getClusters(
+  signal?: AbortSignal,
+  filters?: { search: string; field: 'customer' | 'capacity' | 'cluster'; customer?: string; capacity?: string },
+): Promise<Cluster[]> {
+  const query = filters ? `?${new URLSearchParams({
+    search: filters.search,
+    field: filters.field,
+    customer: filters.customer ?? '',
+    capacity: filters.capacity ?? '',
+  })}` : '';
+  return getJson(`/api/clusters${query}`, signal);
 }
 
 export function getHealth(

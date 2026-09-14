@@ -1,10 +1,15 @@
 QueryCompletion
 | where Source == {{source}} and Timestamp between ({{start}} .. {{end}})
+| extend scan = todynamic(ScannedExtentsStatistics)
 | summarize
     executions = count(),
     totalCpuMs = sum(TotalCPU / 1ms),
     p95DurationMs = percentile(Duration / 1ms, 95),
     peakMemoryBytes = max(MemoryPeak),
-    failures = countif(State !~ "Completed")
-  by application = Application, workloadGroup = WorkloadGroup, query = substring(replace_regex(Text, @"[\r\n]+", " "), 0, 220)
+    failures = countif(State !~ "Completed"),
+    scannedExtents = sum(tolong(scan.ScannedExtentsCount)),
+    totalExtents = sum(tolong(scan.TotalExtentsCount)),
+    scannedRows = sum(tolong(scan.ScannedRowsCount)),
+    totalRows = sum(tolong(scan.TotalRowsCount))
+  by application = Application, workloadGroup = WorkloadGroup, query = Text
 | top 20 by totalCpuMs desc

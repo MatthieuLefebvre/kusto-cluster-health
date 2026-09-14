@@ -1,6 +1,12 @@
 DimClustersMv
 | summarize arg_max(LastUpdated, *) by Source
 | where isnotempty(Source) and State =~ "Running"
+| where isempty({{search}}) or
+    ({{field}} == "customer" and TenantName contains {{search}}) or
+    ({{field}} == "capacity" and CapacityId contains {{search}}) or
+    ({{field}} == "cluster" and (AzureServiceInstance contains {{search}} or Source contains {{search}}))
+| where isempty({{customer}}) or TenantName == {{customer}}
+| where isempty({{capacity}}) or CapacityId =~ {{capacity}}
 | order by LastUpdated desc
 | project
     Source,

@@ -2,6 +2,10 @@ Memento
 | where Source == {{source}} and Timestamp between ({{start}} .. {{end}})
 | where isempty({{operation}}) or Event contains {{operation}}
 | where Event contains "ALTER" or ChangeCommand startswith ".alter" or ChangeCommand startswith ".set-or"
-| project timestamp = Timestamp, event = Event, entityName = EntityName, database = Database, principal = Principal, changeCommand = ChangeCommand, activityId = ActivityID
-| order by timestamp desc
-| take 250
+| extend isApplication = Principal startswith "AAD app id="
+| extend isNative = Principal =~ "KustoServiceBuiltInPrincipal" or (isApplication and (Event contains "EXTENTCONTAINER" or Event contains "SYSTEM-PROPERTIES" or ChangeCommand contains "system_properties"))
+| extend reviewPriority = case(Principal contains "@", 3, isApplication and not(isNative), 2, not(isNative), 1, 0)
+| project timestamp = Timestamp, event = Event, entityName = EntityName, database = Database, principal = Principal, changeCommand = ChangeCommand, activityId = ActivityID, reviewPriority
+| order by reviewPriority desc, timestamp desc
+| take {{changeLimit}}
+| project-away reviewPriority

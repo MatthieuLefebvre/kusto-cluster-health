@@ -14,12 +14,24 @@ const healthRequest = z.object({
   operation: z.string().max(80).optional().default(''),
 }).refine(({ start, end }) => new Date(start) < new Date(end), 'Start must be before end.');
 
+const catalogRequest = z.object({
+  search: z.string().max(160).optional().default(''),
+  field: z.enum(['customer', 'capacity', 'cluster']).optional().default('cluster'),
+  customer: z.string().max(256).optional().default(''),
+  capacity: z.string().max(160).optional().default(''),
+});
+
 function intervalFor(start: string, end: string): string {
   const hours = (new Date(end).getTime() - new Date(start).getTime()) / 3_600_000;
   if (hours <= 12) return '5m';
   if (hours <= 48) return '15m';
   if (hours <= 168) return '30m';
-  return '1h';
+  if (hours <= 336) return '1h';
+  if (hours <= 31 * 24) return '2h';
+  if (hours <= 93 * 24) return '6h';
+  if (hours <= 186 * 24) return '12h';
+  if (hours <= 366 * 24) return '1d';
+  return '7d';
 }
 
 function normalizeCluster(row: Record<string, unknown>) {
@@ -43,9 +55,10 @@ app.get('/api/healthz', (_request, response) => {
   response.json({ status: 'ok', database: process.env.KUSTO_DATABASE ?? 'Kuskus' });
 });
 
-app.get('/api/clusters', async (_request, response, next) => {
+app.get('/api/clusters', async (request, response, next) => {
   try {
-    const rows = await queryKusto(await loadQuery('clusters'));
+    const input = catalogRequest.parse(request.query);
+    const rows = await queryKusto(await loadQuery('clusters', input));
     response.json(rows.map(normalizeCluster));
   } catch (error) {
     next(error);
@@ -55,7 +68,7 @@ app.get('/api/clusters', async (_request, response, next) => {
 app.get('/api/health', async (request, response, next) => {
   try {
     const input = healthRequest.parse(request.query);
-    const bindings = { ...input, interval: intervalFor(input.start, input.end) };
+    const bindings = { ...input, interval: intervalFor(input.start, input.end), changeLimit: input.operation ? 2000 : 250 };
     const queryNames = ['metadata', 'cpu', 'memory', 'disk-queue', 'cache', 'queries', 'changes', 'top-queries'] as const;
     const results = await Promise.all(queryNames.map(async (name) => [
       name,
