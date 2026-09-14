@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 
 import { MetricCard } from '@/components/MetricCard';
+import { KqlViewer, type KqlEntry } from '@/components/KqlViewer';
 import { SearchableFilter } from '@/components/SearchableFilter';
 import { TrendChart } from '@/components/TrendChart';
 import { assessChange } from '@/services/changeAssessment';
@@ -24,6 +25,7 @@ const RANGE_OPTIONS = [
   { label: '6 months', value: '6m', days: 180 },
   { label: '12 months', value: '12m', days: 365 },
   { label: 'All available', value: 'all', days: null },
+  { label: 'Custom UTC range', value: 'custom', days: null },
 ];
 const OPERATION_OPTIONS = [
   'ALTER-TABLE-EXTENTS-MERGE-POLICY',
@@ -41,6 +43,10 @@ function compact(value: number) {
 
 function percent(value: number) {
   return `${value.toFixed(1)}%`;
+}
+
+function utcInputValue(date: Date) {
+  return date.toISOString().slice(0, 19);
 }
 
 function bytes(value: number) {
@@ -69,6 +75,10 @@ function scanRatio(scanned: number, total: number) {
   return total ? `${(100 * scanned / total).toFixed(1)}%` : 'Unavailable';
 }
 
+function kqlEntries(data: HealthResponse | null, names: (keyof HealthResponse['kql'])[]): KqlEntry[] {
+  return names.flatMap((name) => data?.kql?.[name] ? [{ label: name, text: data.kql[name] }] : []);
+}
+
 function TopQueryRows({ query, index }: { query: TopQuery; index: number }) {
   const optimization = assessQueryOptimization(query);
   return <Fragment key={`${query.query}-${index}`}>
@@ -86,7 +96,14 @@ export function HomePage() {
   const [customer, setCustomer] = useState('');
   const [capacity, setCapacity] = useState('');
   const [operation, setOperation] = useState('');
-  const [range, setRange] = useState('24h');
+  const [application, setApplication] = useState('');
+  const [workloadGroup, setWorkloadGroup] = useState('');
+  const [range, setRange] = useState('28d');
+  const [customRange, setCustomRange] = useState(() => ({
+    start: utcInputValue(new Date(Date.now() - 28 * 86_400_000)),
+    end: utcInputValue(new Date()),
+  }));
+  const [appliedCustomRange, setAppliedCustomRange] = useState(customRange);
   const [view, setView] = useState<View>('overview');
   const [data, setData] = useState<HealthResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -143,11 +160,20 @@ export function HomePage() {
     }
     const controller = new AbortController();
     const end = new Date();
-    const selectedRange = RANGE_OPTIONS.find((option) => option.value === range) ?? RANGE_OPTIONS[1];
-    const start = selectedRange.days === null ? new Date(0) : new Date(end.getTime() - selectedRange.days * 86_400_000);
+    const selectedRange = RANGE_OPTIONS.find((option) => option.value === range) ?? RANGE_OPTIONS[5];
+    const custom = selectedRange.value === 'custom';
+    const selectedEnd = custom ? new Date(`${appliedCustomRange.end}Z`) : end;
+    const start = custom
+      ? new Date(`${appliedCustomRange.start}Z`)
+      : selectedRange.days === null ? new Date(0) : new Date(end.getTime() - selectedRange.days * 86_400_000);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(selectedEnd.getTime()) || start >= selectedEnd) {
+      setLoading(false);
+      setError('UTC start must be earlier than UTC end.');
+      return;
+    }
     setLoading(true);
     setError('');
-    getHealth(source, start, end, operation, controller.signal)
+    getHealth(source, start, selectedEnd, operation, controller.signal)
       .then((response) => {
         setData(response);
         const cluster = response.metadata[0];
@@ -164,7 +190,7 @@ export function HomePage() {
       })
       .finally(() => setLoading(false));
     return () => controller.abort();
-  }, [source, range, operation, refreshKey]);
+  }, [source, range, operation, refreshKey, appliedCustomRange]);
 
   const customerOptions = useMemo(() => [...new Set(clusters.map((cluster) => cluster.customerName).filter(Boolean))].sort(), [clusters]);
   const capacityOptions = useMemo(() => [...new Set(clusters.filter((cluster) => !customer || cluster.customerName === customer).map((cluster) => cluster.capacityId).filter(Boolean))].sort(), [clusters, customer]);
@@ -206,6 +232,24 @@ export function HomePage() {
   const userChangeCount = assessedChanges.filter(({ assessment }) => assessment.kind === 'user').length;
   const automationChangeCount = assessedChanges.filter(({ assessment }) => assessment.kind === 'automation').length;
   const nativeChangeCount = assessedChanges.filter(({ assessment }) => assessment.kind === 'native').length;
+
+  const topQueries = data?.['top-queries'] ?? [];
+  const applicationOptions = [...new Set(topQueries.map((query) => query.application || 'Unknown'))].sort();
+  const workloadOptions = [...new Set(topQueries
+    .filter((query) => !application || (query.application || 'Unknown') === application)
+    .map((query) => query.workloadGroup || 'default'))].sort();
+  const filteredTopQueries = topQueries.filter((query) =>
+    (!application || (query.application || 'Unknown') === application)
+    && (!workloadGroup || (query.workloadGroup || 'default') === workloadGroup));
+
+  const selectApplication = (value: string) => {
+    setApplication(value);
+    if (value && !topQueries.some((query) =>
+      (query.application || 'Unknown') === value
+      && (!workloadGroup || (query.workloadGroup || 'default') === workloadGroup))) {
+      setWorkloadGroup('');
+    }
+  };
 
   const selectCustomer = (value: string) => {
     filtersTouchedRef.current = true;
@@ -269,6 +313,7 @@ export function HomePage() {
         <SearchableFilter label="Operation" options={OPERATION_OPTIONS} placeholder="All alterations" value={operation} onChange={setOperation} allowCustomValue />
         <label><span>Time range</span><select value={range} onChange={(event) => setRange(event.target.value)}>{RANGE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
         <button className="icon-button refresh-button" disabled={!source} onClick={() => setRefreshKey((value) => value + 1)} title="Refresh analysis" aria-label="Refresh analysis"><RefreshCw size={18} className={loading ? 'spin' : ''} /></button>
+        {range === 'custom' && <div className="custom-time-range"><label><span>UTC start</span><input type="datetime-local" step="1" value={customRange.start} max={customRange.end} onChange={(event) => setCustomRange((current) => ({ ...current, start: event.target.value }))} /></label><label><span>UTC end</span><input type="datetime-local" step="1" value={customRange.end} min={customRange.start} onChange={(event) => setCustomRange((current) => ({ ...current, end: event.target.value }))} /></label><button type="button" onClick={() => setAppliedCustomRange(customRange)}>Apply range</button></div>}
       </section>
 
       <section className="context-strip">
@@ -290,32 +335,32 @@ export function HomePage() {
 
       {source && view === 'overview' && <>
         <section className="metric-grid" aria-label="Health indicators">
-          <MetricCard label="Health score" value={loading ? '—' : `${metrics.score}/100`} detail="Heuristic triage score" tone={metrics.score >= 85 ? 'good' : metrics.score >= 65 ? 'warn' : 'critical'} icon={ShieldCheck} />
-          <MetricCard label="CPU P95" value={loading ? '—' : percent(metrics.cpu)} detail="Engine nodes · peak interval" tone={metrics.cpu < 75 ? 'good' : metrics.cpu < 90 ? 'warn' : 'critical'} icon={Cpu} />
-          <MetricCard label="Hot-cache hits" value={loading || !metrics.cache ? '—' : percent(metrics.cache)} detail="Shard bytes served hot" tone={!metrics.cache ? 'neutral' : metrics.cache >= 80 ? 'good' : 'warn'} icon={Database} />
-          <MetricCard label="Query failures" value={loading ? '—' : percent(metrics.failures)} detail={`${compact(metrics.queries)} query completions`} tone={metrics.failures < 1 ? 'good' : metrics.failures < 2 ? 'warn' : 'critical'} icon={Search} />
-          <MetricCard label="Disk queue P95" value={loading ? '—' : metrics.disk.toFixed(1)} detail="Peak interval across nodes" tone={metrics.disk < 2 ? 'good' : metrics.disk < 5 ? 'warn' : 'critical'} icon={HardDrive} />
+          <MetricCard label="Health score" value={loading ? '—' : `${metrics.score}/100`} detail="Heuristic triage score" tone={metrics.score >= 85 ? 'good' : metrics.score >= 65 ? 'warn' : 'critical'} icon={ShieldCheck} queries={kqlEntries(data, ['cpu', 'cache', 'queries', 'disk-queue'])} />
+          <MetricCard label="CPU P95" value={loading ? '—' : percent(metrics.cpu)} detail="Engine nodes · peak interval" tone={metrics.cpu < 75 ? 'good' : metrics.cpu < 90 ? 'warn' : 'critical'} icon={Cpu} queries={kqlEntries(data, ['cpu'])} />
+          <MetricCard label="Hot-cache hits" value={loading || !metrics.cache ? '—' : percent(metrics.cache)} detail="Shard bytes served hot" tone={!metrics.cache ? 'neutral' : metrics.cache >= 80 ? 'good' : 'warn'} icon={Database} queries={kqlEntries(data, ['cache'])} />
+          <MetricCard label="Query failures" value={loading ? '—' : percent(metrics.failures)} detail={`${compact(metrics.queries)} query completions`} tone={metrics.failures < 1 ? 'good' : metrics.failures < 2 ? 'warn' : 'critical'} icon={Search} queries={kqlEntries(data, ['queries'])} />
+          <MetricCard label="Disk queue P95" value={loading ? '—' : metrics.disk.toFixed(1)} detail="Peak interval across nodes" tone={metrics.disk < 2 ? 'good' : metrics.disk < 5 ? 'warn' : 'critical'} icon={HardDrive} queries={kqlEntries(data, ['disk-queue'])} />
         </section>
 
         <section className="overview-layout">
           <div className="charts-column">
-            <article className="panel"><header><div><small>Compute</small><h2>CPU pressure</h2></div><span>P95 and average, engine nodes</span></header><TrendChart data={(data?.cpu.filter((point) => !point.IsAdmin) ?? []) as unknown as Record<string, unknown>[]} lines={[{ key: 'avgCpu', label: 'Average', color: '#237b73' }, { key: 'p95Cpu', label: 'P95', color: '#d17b30' }]} formatter={(value) => `${value.toFixed(0)}%`} threshold={80} /></article>
+            <article className="panel"><header><div><small>Compute</small><h2>CPU pressure</h2></div><div className="tile-actions"><span>P95 and average, engine nodes</span><KqlViewer title="CPU pressure" queries={kqlEntries(data, ['cpu'])} /></div></header><TrendChart data={(data?.cpu.filter((point) => !point.IsAdmin) ?? []) as unknown as Record<string, unknown>[]} lines={[{ key: 'avgCpu', label: 'Average', color: '#237b73' }, { key: 'p95Cpu', label: 'P95', color: '#d17b30' }]} formatter={(value) => `${value.toFixed(0)}%`} threshold={80} /></article>
             <div className="chart-pair">
-              <article className="panel"><header><div><small>Cache</small><h2>Hot-cache hit ratio</h2></div></header><TrendChart data={(data?.cache ?? []) as unknown as Record<string, unknown>[]} lines={[{ key: 'hotHitRatio', label: 'Hot hit ratio', color: '#237b73' }]} formatter={(value) => `${value.toFixed(2)}%`} threshold={80} /></article>
-              <article className="panel"><header><div><small>Cache volume</small><h2>Hot-cache usage</h2></div><span>{bytes(metrics.hotHitBytes)} served hot · {bytes(metrics.hotMissBytes)} missed</span></header><TrendChart data={(data?.cache ?? []) as unknown as Record<string, unknown>[]} lines={[{ key: 'hotHitBytes', label: 'Hot hits', color: '#237b73' }, { key: 'hotMissBytes', label: 'Hot misses', color: '#c7564d' }]} formatter={bytes} /></article>
+              <article className="panel"><header><div><small>Cache</small><h2>Hot-cache hit ratio</h2></div><KqlViewer title="Hot-cache hit ratio" queries={kqlEntries(data, ['cache'])} /></header><TrendChart data={(data?.cache ?? []) as unknown as Record<string, unknown>[]} lines={[{ key: 'hotHitRatio', label: 'Hot hit ratio', color: '#237b73' }]} formatter={(value) => `${value.toFixed(2)}%`} threshold={80} /></article>
+              <article className="panel"><header><div><small>Cache volume</small><h2>Hot-cache usage</h2></div><div className="tile-actions"><span>{bytes(metrics.hotHitBytes)} served hot · {bytes(metrics.hotMissBytes)} missed</span><KqlViewer title="Hot-cache usage" queries={kqlEntries(data, ['cache'])} /></div></header><TrendChart data={(data?.cache ?? []) as unknown as Record<string, unknown>[]} lines={[{ key: 'hotHitBytes', label: 'Hot hits', color: '#237b73' }, { key: 'hotMissBytes', label: 'Hot misses', color: '#c7564d' }]} formatter={bytes} /></article>
             </div>
-            <article className="panel"><header><div><small>Queries</small><h2>Latency P95</h2></div></header><TrendChart data={(data?.queries ?? []) as unknown as Record<string, unknown>[]} lines={[{ key: 'p95DurationMs', label: 'P95 duration', color: '#3975a5' }]} formatter={(value) => value >= 1000 ? `${(value / 1000).toFixed(1)}s` : `${value.toFixed(0)}ms`} /></article>
+            <article className="panel"><header><div><small>Queries</small><h2>Latency P95</h2></div><KqlViewer title="Latency P95" queries={kqlEntries(data, ['queries'])} /></header><TrendChart data={(data?.queries ?? []) as unknown as Record<string, unknown>[]} lines={[{ key: 'p95DurationMs', label: 'P95 duration', color: '#3975a5' }]} formatter={(value) => value >= 1000 ? `${(value / 1000).toFixed(1)}s` : `${value.toFixed(0)}ms`} /></article>
           </div>
-          <aside className="findings-panel"><header><SlidersHorizontal size={17} /><div><small>Automated triage</small><h2>Investigation findings</h2></div></header>{findings.map((finding) => <div className={`finding finding--${finding.level}`} key={finding.title}><span /><div><strong>{finding.title}</strong><p>{finding.detail}</p></div></div>)}<p className="method-note">Thresholds are triage aids, not service limits. Validate against the cluster baseline and incident timeline.</p></aside>
+          <aside className="findings-panel"><header><SlidersHorizontal size={17} /><div><small>Automated triage</small><h2>Investigation findings</h2></div><KqlViewer title="Investigation findings" queries={kqlEntries(data, ['cpu', 'cache', 'queries', 'disk-queue', 'changes'])} /></header>{findings.map((finding) => <div className={`finding finding--${finding.level}`} key={finding.title}><span /><div><strong>{finding.title}</strong><p>{finding.detail}</p></div></div>)}<p className="method-note">Thresholds are triage aids, not service limits. Validate against the cluster baseline and incident timeline.</p></aside>
         </section>
       </>}
 
       {source && view === 'workload' && <section className="workload-view">
-        <article className="panel disk-panel"><header><div><small>Storage</small><h2>Disk queue pressure</h2></div><span>Compare with cache misses and merge windows</span></header><TrendChart data={(data?.['disk-queue'] ?? []) as unknown as Record<string, unknown>[]} lines={[{ key: 'avgDiskQueue', label: 'Average', color: '#3975a5' }, { key: 'p95DiskQueue', label: 'P95', color: '#c7564d' }]} threshold={2} /></article>
-        <article className="table-panel"><header><div><small>Resource consumers</small><h2>Top queries by total CPU</h2></div><span>Expand a query for KQL, scan evidence, and optimization ideas</span></header><div className="table-scroll"><table><thead><tr><th>Application / workload</th><th>Query and analysis</th><th>Executions</th><th>Total CPU</th><th>P95 duration</th><th>Peak memory</th><th>Failures</th></tr></thead><tbody>{data?.['top-queries'].map((query, index) => <TopQueryRows query={query} index={index} key={`${query.query}-${index}`} />)}</tbody></table></div></article>
+        <article className="panel disk-panel"><header><div><small>Storage</small><h2>Disk queue pressure</h2></div><div className="tile-actions"><span>Compare with cache misses and merge windows</span><KqlViewer title="Disk queue pressure" queries={kqlEntries(data, ['disk-queue'])} /></div></header><TrendChart data={(data?.['disk-queue'] ?? []) as unknown as Record<string, unknown>[]} lines={[{ key: 'avgDiskQueue', label: 'Average', color: '#3975a5' }, { key: 'p95DiskQueue', label: 'P95', color: '#c7564d' }]} threshold={2} /></article>
+        <article className="table-panel"><header><div><small>Resource consumers</small><h2>Top queries by total CPU</h2></div><div className="tile-actions"><span>Expand a query for KQL, scan evidence, and optimization ideas</span><KqlViewer title="Top queries by total CPU" queries={kqlEntries(data, ['top-queries'])} /></div></header><div className="workload-filters"><label><span>Application</span><select value={application} onChange={(event) => selectApplication(event.target.value)}><option value="">All applications</option>{applicationOptions.map((value) => <option key={value} value={value}>{value}</option>)}</select></label><label><span>Workload</span><select value={workloadGroup} onChange={(event) => setWorkloadGroup(event.target.value)}><option value="">All workloads</option>{workloadOptions.map((value) => <option key={value} value={value}>{value}</option>)}</select></label><span>{filteredTopQueries.length} of {topQueries.length} queries</span></div><div className="table-scroll"><table><thead><tr><th>Application / workload</th><th>Query and analysis</th><th>Executions</th><th>Total CPU</th><th>P95 duration</th><th>Peak memory</th><th>Failures</th></tr></thead><tbody>{filteredTopQueries.map((query, index) => <TopQueryRows query={query} index={index} key={`${query.query}-${index}`} />)}</tbody></table></div></article>
       </section>}
 
-      {source && view === 'changes' && <section className="table-panel changes-view"><header><div><small>Memento audit</small><h2>Cluster and database alterations</h2></div><span>{data?.changes.length ?? 0} {operation ? 'matching' : 'prioritized'} events shown</span></header><div className="change-review-summary" role="region" aria-label="Change assessment summary"><strong>{userChangeCount} likely user {userChangeCount === 1 ? 'change' : 'changes'}</strong><span>{automationChangeCount} automation</span><span>{nativeChangeCount} native maintenance</span></div><div className="table-scroll"><table><thead><tr><th>Assessment</th><th>Timestamp</th><th>Operation</th><th>Entity / database</th><th>Command</th><th>Principal</th></tr></thead><tbody>{assessedChanges.map(({ change, assessment }, index) => <tr className={`change-row change-row--${assessment.kind}`} key={`${change.activityId}-${change.event}-${index}`}><td><span className={`assessment-tag assessment-tag--${assessment.kind}`}>{assessment.label}</span><small className="assessment-reason">{assessment.reason}</small></td><td>{new Date(change.timestamp).toLocaleString()}</td><td><span className="operation-tag">{change.event}</span></td><td><strong>{change.entityName}</strong><small>{change.database}</small></td><td className="command-cell">{change.changeCommand}</td><td>{change.principal || 'Unavailable'}</td></tr>)}</tbody></table></div></section>}
+      {source && view === 'changes' && <section className="table-panel changes-view"><header><div><small>Memento audit</small><h2>Cluster and database alterations</h2></div><div className="tile-actions"><span>{data?.changes.length ?? 0} {operation ? 'matching' : 'prioritized'} events shown</span><KqlViewer title="Cluster and database alterations" queries={kqlEntries(data, ['changes'])} /></div></header><div className="change-review-summary" role="region" aria-label="Change assessment summary"><strong>{userChangeCount} likely user {userChangeCount === 1 ? 'change' : 'changes'}</strong><span>{automationChangeCount} automation</span><span>{nativeChangeCount} native maintenance</span></div><div className="table-scroll"><table><thead><tr><th>Assessment</th><th>Timestamp</th><th>Operation</th><th>Entity / database</th><th>Command</th><th>Principal</th></tr></thead><tbody>{assessedChanges.map(({ change, assessment }, index) => <tr className={`change-row change-row--${assessment.kind}`} key={`${change.activityId}-${change.event}-${index}`}><td><span className={`assessment-tag assessment-tag--${assessment.kind}`}>{assessment.label}</span><small className="assessment-reason">{assessment.reason}</small></td><td>{new Date(change.timestamp).toLocaleString()}</td><td><span className="operation-tag">{change.event}</span></td><td><strong>{change.entityName}</strong><small>{change.database}</small></td><td className="command-cell">{change.changeCommand}</td><td>{change.principal || 'Unavailable'}</td></tr>)}</tbody></table></div></section>}
     </main>
   );
 }

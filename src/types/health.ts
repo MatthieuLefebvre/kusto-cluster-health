@@ -82,6 +82,7 @@ export interface HealthResponse {
   source: string;
   generatedAt: string;
   range: { start: string; end: string; interval: string };
+  kql: Record<'metadata' | 'cpu' | 'memory' | 'disk-queue' | 'cache' | 'queries' | 'changes' | 'top-queries', string>;
   metadata: Cluster[];
   cpu: CpuPoint[];
   memory: MemoryPoint[];

@@ -8,7 +8,7 @@ interface TrendChartProps {
 }
 
 function timeLabel(value: string) {
-  return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
+  return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC', timeZoneName: 'short' }).format(new Date(value));
 }
 
 export function TrendChart({ data, lines, formatter = (value) => value.toFixed(1), threshold }: TrendChartProps) {

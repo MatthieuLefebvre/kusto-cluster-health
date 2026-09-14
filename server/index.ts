@@ -70,9 +70,13 @@ app.get('/api/health', async (request, response, next) => {
     const input = healthRequest.parse(request.query);
     const bindings = { ...input, interval: intervalFor(input.start, input.end), changeLimit: input.operation ? 2000 : 250 };
     const queryNames = ['metadata', 'cpu', 'memory', 'disk-queue', 'cache', 'queries', 'changes', 'top-queries'] as const;
+    const queries = Object.fromEntries(await Promise.all(queryNames.map(async (name) => [
+      name,
+      await loadQuery(name, bindings),
+    ] as const)));
     const results = await Promise.all(queryNames.map(async (name) => [
       name,
-      await queryKusto(await loadQuery(name, bindings)),
+      await queryKusto(queries[name]),
     ] as const));
 
     const data = Object.fromEntries(results);
@@ -80,6 +84,7 @@ app.get('/api/health', async (request, response, next) => {
       source: input.source,
       range: { start: input.start, end: input.end, interval: bindings.interval },
       generatedAt: new Date().toISOString(),
+      kql: queries,
       ...data,
       metadata: (data.metadata ?? []).map(normalizeCluster),
     });

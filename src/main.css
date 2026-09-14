@@ -60,6 +60,11 @@ button, input, select { font: inherit; }
 .filter-band label > span { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--muted); }
 .filter-band select { width: 100%; height: 37px; padding: 0 30px 0 10px; color: var(--ink); background: #fff; border: 1px solid #cbd5d0; border-radius: 5px; font-size: 12px; }
 .filter-band select:focus { outline: 2px solid rgba(35,123,115,.22); border-color: var(--brand); }
+.custom-time-range { grid-column: 1 / -1; padding-top: 4px; display: grid; grid-template-columns: minmax(210px, 1fr) minmax(210px, 1fr) auto; align-items: end; gap: 10px; }
+.custom-time-range input { height: 35px; padding: 0 10px; color: var(--ink); background: #fff; border: 1px solid #cbd5d0; border-radius: 5px; font-size: 12px; }
+.custom-time-range input:focus { outline: 2px solid rgba(35,123,115,.22); border-color: var(--brand); }
+.custom-time-range button { height: 37px; padding: 0 16px; color: #fff; background: var(--brand); border: 0; border-radius: 5px; cursor: pointer; font-size: 11px; font-weight: 700; }
+.custom-time-range button:hover { background: #1c6760; }
 .searchable-filter { position: relative; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
 .filter-label { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--muted); }
 .searchable-filter__control { height: 35px; padding: 0 9px; display: flex; align-items: center; gap: 7px; color: var(--muted); background: #fff; border: 1px solid #cbd5d0; border-radius: 5px; }
@@ -99,6 +104,7 @@ button, input, select { font: inherit; }
 .metric-card--warn { border-top-color: var(--warning); }
 .metric-card--critical { border-top-color: var(--danger); }
 .metric-card__top { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 11px; font-weight: 600; }
+.metric-card__top > div { display: flex; align-items: center; gap: 7px; }
 .metric-card strong { display: block; margin: 11px 0 5px; font-family: 'IBM Plex Mono', monospace; font-size: 25px; letter-spacing: 0; }
 .metric-card small { display: block; color: #7d8884; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
@@ -111,6 +117,22 @@ button, input, select { font: inherit; }
 .panel header small, .table-panel header small, .findings-panel header small { color: var(--brand); font-size: 9px; font-weight: 700; text-transform: uppercase; }
 .panel h2, .table-panel h2, .findings-panel h2 { margin: 2px 0 0; font-size: 14px; letter-spacing: 0; }
 .panel header > span, .table-panel header > span { color: var(--muted); font-size: 10px; }
+.tile-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; color: var(--muted); font-size: 10px; text-align: right; }
+.kql-trigger { width: 28px; height: 28px; padding: 0; display: grid; flex: 0 0 auto; place-items: center; color: var(--brand); background: var(--brand-soft); border: 0; border-radius: 4px; cursor: pointer; }
+.kql-trigger:hover { color: #fff; background: var(--brand); }
+.kql-dialog { width: min(960px, calc(100vw - 40px)); max-height: min(760px, calc(100vh - 40px)); padding: 0; color: var(--ink); background: #fff; border: 1px solid #b9c7c1; border-radius: 6px; box-shadow: 0 24px 70px rgba(18,38,34,.28); }
+.kql-dialog::backdrop { background: rgba(13,30,27,.58); }
+.kql-dialog > header { min-height: 48px; padding: 13px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
+.kql-dialog header small { color: var(--brand); font-size: 9px; font-weight: 700; text-transform: uppercase; }
+.kql-dialog header h2 { margin: 2px 0 0; font-size: 14px; }
+.kql-dialog header button { width: 30px; height: 30px; padding: 0; display: grid; place-items: center; color: var(--muted); background: transparent; border: 0; border-radius: 4px; cursor: pointer; }
+.kql-dialog header button:hover { color: var(--ink); background: #edf2ef; }
+.kql-dialog__body { max-height: calc(100vh - 130px); padding: 16px; overflow: auto; }
+.kql-dialog__body section + section { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); }
+.kql-dialog__body section > div { margin-bottom: 7px; display: flex; align-items: center; justify-content: space-between; }
+.kql-dialog__body h3 { margin: 0; font-size: 11px; text-transform: uppercase; }
+.kql-dialog__body button { height: 29px; padding: 0 9px; display: flex; align-items: center; gap: 6px; color: #fff; background: var(--brand); border: 0; border-radius: 4px; cursor: pointer; font-size: 10px; font-weight: 700; }
+.kql-dialog__body pre { margin: 0; padding: 14px; overflow: auto; color: #dcefeb; background: #172b28; border-radius: 4px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; line-height: 1.6; white-space: pre; }
 .trend-chart { height: 230px; margin-top: 6px; }
 .chart-pair .trend-chart { height: 190px; }
 .recharts-default-tooltip { border: 1px solid var(--line) !important; border-radius: 4px !important; font-size: 11px; }
@@ -131,6 +153,12 @@ button, input, select { font: inherit; }
 .disk-panel .trend-chart { height: 210px; }
 .table-panel { min-width: 0; overflow: hidden; }
 .table-panel > header { padding: 16px 18px 12px; }
+.workload-filters { min-height: 52px; padding: 8px 18px; display: flex; align-items: end; gap: 10px; background: #f6f8f7; border-top: 1px solid var(--line); }
+.workload-filters label { width: min(240px, 30vw); display: flex; flex-direction: column; gap: 4px; }
+.workload-filters label span { color: var(--muted); font-size: 9px; font-weight: 700; text-transform: uppercase; }
+.workload-filters select { height: 32px; padding: 0 28px 0 9px; color: var(--ink); background: #fff; border: 1px solid #cbd5d0; border-radius: 5px; font-size: 11px; }
+.workload-filters select:focus { outline: 2px solid rgba(35,123,115,.22); border-color: var(--brand); }
+.workload-filters > span { margin: 0 0 8px auto; color: var(--muted); font-size: 10px; white-space: nowrap; }
 .table-scroll { width: 100%; overflow: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 11px; }
 th { padding: 9px 12px; text-align: left; color: var(--muted); background: #f1f5f2; border-block: 1px solid var(--line); font-size: 9px; text-transform: uppercase; white-space: nowrap; }
@@ -164,8 +192,8 @@ td small { margin-top: 3px; color: var(--muted); }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (max-width: 1050px) { .filter-band { grid-template-columns: repeat(3,minmax(0,1fr)); } .refresh-button { width: 100%; } .metric-grid { grid-template-columns: repeat(3,minmax(0,1fr)); } .overview-layout { grid-template-columns: 1fr; } }
-@media (max-width: 720px) { .app-header, .filter-band, .context-strip, .metric-grid, .overview-layout { padding-left: 16px; padding-right: 16px; } .filter-band { grid-template-columns: 1fr 1fr; } .filter-wide { grid-column: 1 / -1; } .context-strip { padding-block: 9px; flex-wrap: wrap; gap: 8px 16px; } .view-tabs { padding-left: 16px; overflow-x: auto; } .metric-grid { grid-template-columns: 1fr 1fr; } .chart-pair { grid-template-columns: 1fr; } .workload-view, .changes-view, .empty-analysis { margin-inline: 16px; } .query-details__body { width: 78vw; grid-template-columns: 1fr; } .query-details__body dl { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 460px) { .connection-state { display: none; } .filter-band, .metric-grid { grid-template-columns: 1fr; } .filter-wide { grid-column: auto; } .app-brand small { display: none; } }
+@media (max-width: 720px) { .app-header, .filter-band, .context-strip, .metric-grid, .overview-layout { padding-left: 16px; padding-right: 16px; } .filter-band { grid-template-columns: 1fr 1fr; } .filter-wide { grid-column: 1 / -1; } .custom-time-range { grid-template-columns: 1fr 1fr; } .custom-time-range button { grid-column: 1 / -1; } .context-strip { padding-block: 9px; flex-wrap: wrap; gap: 8px 16px; } .view-tabs { padding-left: 16px; overflow-x: auto; } .metric-grid { grid-template-columns: 1fr 1fr; } .chart-pair { grid-template-columns: 1fr; } .workload-view, .changes-view, .empty-analysis { margin-inline: 16px; } .workload-filters { align-items: stretch; flex-wrap: wrap; } .workload-filters label { width: calc(50% - 5px); } .workload-filters > span { width: 100%; margin: 0; } .query-details__body { width: 78vw; grid-template-columns: 1fr; } .query-details__body dl { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 460px) { .connection-state { display: none; } .filter-band, .metric-grid, .custom-time-range { grid-template-columns: 1fr; } .filter-wide, .custom-time-range button { grid-column: auto; } .app-brand small { display: none; } }
 
 /* ── Universal App landing ──────────────────────────────────────────────────
    A branded hero with a recolorable "Rayfin" wordmark and a playful light-bulb
