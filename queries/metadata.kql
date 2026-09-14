@@ -1,0 +1,14 @@
+LatestDimCluster({{source}})
+| project
+    Source,
+    AzureServiceInstance,
+    TenantName,
+    Account,
+    CapacityId = toupper(CapacityId),
+    Kind,
+    Region,
+    MachineCount,
+    MachineSKU,
+    State,
+    ServiceOffering,
+    LastUpdated

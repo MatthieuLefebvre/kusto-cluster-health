@@ -1,0 +1,16 @@
+DimClustersMv
+| summarize arg_max(LastUpdated, *) by Source
+| where isnotempty(Source) and State =~ "Running"
+| order by LastUpdated desc
+| project
+    Source,
+    AzureServiceInstance,
+    TenantName,
+    Account,
+    CapacityId = toupper(CapacityId),
+    Kind,
+    Region,
+    MachineCount,
+    MachineSKU,
+    ServiceOffering
+| take 5000

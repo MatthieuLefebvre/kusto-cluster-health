@@ -1,0 +1,4 @@
+PerfCounterMemoryAvailable
+| where Source == {{source}} and Timestamp between ({{start}} .. {{end}})
+| summarize avgAvailableMb = avg(CounterValue), minAvailableMb = min(CounterValue) by timestamp = bin(Timestamp, {{interval}})
+| order by timestamp asc

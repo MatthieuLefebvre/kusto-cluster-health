@@ -1,0 +1,12 @@
+OverallQueryStats
+| where Source == {{source}} and Timestamp between ({{start}} .. {{end}})
+| summarize
+    hotHitBytes = sum(ShardsHotHitBytes),
+    hotMissBytes = sum(ShardsHotMissBytes),
+    coldHitBytes = sum(ShardsColdHitBytes),
+    coldMissBytes = sum(ShardsColdMissBytes),
+    queryCount = dcount(RootActivityId)
+  by timestamp = bin(Timestamp, {{interval}})
+| extend hotHitRatio = iff(hotHitBytes + hotMissBytes == 0, real(null), 100.0 * hotHitBytes / (hotHitBytes + hotMissBytes))
+| project timestamp, hotHitRatio, hotHitBytes, hotMissBytes, coldHitBytes, coldMissBytes, queryCount
+| order by timestamp asc

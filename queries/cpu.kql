@@ -1,0 +1,4 @@
+PerfCounterCPU
+| where Source == {{source}} and Timestamp between ({{start}} .. {{end}})
+| summarize avgCpu = avg(CounterValue), p95Cpu = percentile(CounterValue, 95), maxCpu = max(CounterValue) by timestamp = bin(Timestamp, {{interval}}), IsAdmin
+| order by timestamp asc

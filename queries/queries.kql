@@ -1,0 +1,12 @@
+QueryCompletion
+| where Source == {{source}} and Timestamp between ({{start}} .. {{end}})
+| summarize
+    queryCount = count(),
+    failedQueries = countif(State !~ "Completed"),
+    p50DurationMs = percentile(Duration / 1ms, 50),
+    p95DurationMs = percentile(Duration / 1ms, 95),
+    totalCpuMs = sum(TotalCPU / 1ms),
+    peakMemoryBytes = max(MemoryPeak)
+  by timestamp = bin(Timestamp, {{interval}})
+| extend failureRate = 100.0 * failedQueries / queryCount
+| order by timestamp asc

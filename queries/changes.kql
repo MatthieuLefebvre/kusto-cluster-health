@@ -1,0 +1,7 @@
+Memento
+| where Source == {{source}} and Timestamp between ({{start}} .. {{end}})
+| where isempty({{operation}}) or Event contains {{operation}}
+| where Event contains "ALTER" or ChangeCommand startswith ".alter" or ChangeCommand startswith ".set-or"
+| project timestamp = Timestamp, event = Event, entityName = EntityName, database = Database, principal = Principal, changeCommand = ChangeCommand, activityId = ActivityID
+| order by timestamp desc
+| take 250

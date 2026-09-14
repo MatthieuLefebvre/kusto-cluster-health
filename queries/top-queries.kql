@@ -1,0 +1,10 @@
+QueryCompletion
+| where Source == {{source}} and Timestamp between ({{start}} .. {{end}})
+| summarize
+    executions = count(),
+    totalCpuMs = sum(TotalCPU / 1ms),
+    p95DurationMs = percentile(Duration / 1ms, 95),
+    peakMemoryBytes = max(MemoryPeak),
+    failures = countif(State !~ "Completed")
+  by application = Application, workloadGroup = WorkloadGroup, query = substring(replace_regex(Text, @"[\r\n]+", " "), 0, 220)
+| top 20 by totalCpuMs desc

@@ -1,0 +1,4 @@
+PerfCounterDiskCQueue
+| where Source == {{source}} and Timestamp between ({{start}} .. {{end}})
+| summarize avgDiskQueue = avg(CounterValue), p95DiskQueue = percentile(CounterValue, 95), maxDiskQueue = max(CounterValue) by timestamp = bin(Timestamp, {{interval}})
+| order by timestamp asc
